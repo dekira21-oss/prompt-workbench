@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>프롬프트 생성기 · 프롬프트 작업대</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .head { padding: 48px 0 24px; }
+    section { padding-top: 0; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+    .form { padding: 20px; display: grid; gap: 18px; }
+    .field label { display: flex; align-items: baseline; gap: 8px; font-weight: 700; margin-bottom: 6px; }
+    .field label .num { color: var(--accent); font-size: 13px; }
+    .field label small { font-weight: 400; color: var(--muted); font-size: 13px; }
+    .start label { font-weight: 700; display: block; margin-bottom: 6px; }
+    .result { position: sticky; top: 76px; padding: 20px; display: grid; gap: 12px; }
+    .result h3 { font-size: 18px; }
+    .result .prompt-box { min-height: 260px; max-height: 60vh; overflow: auto; }
+    .result .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .warn { font-size: 14px; color: var(--accent); margin: 0; }
+    .meter { font-size: 14px; color: var(--muted); margin: 0; }
+    @media (max-width: 860px) { .result { position: static; } }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="logo" href="index.html"><b>작</b>프롬프트 작업대</a>
+      <nav>
+        <a href="prompts.html">프롬프트 모음</a>
+        <a href="generator.html" aria-current="page">생성기</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap head">
+      <p class="eyebrow">GENERATOR</p>
+      <h2>다섯 칸 프롬프트 생성기</h2>
+      <p class="lead">빈칸을 채우면 오른쪽에 프롬프트가 바로 완성돼요. 쓰던 내용은 이 브라우저에 자동으로 저장됩니다.</p>
+    </div>
+    <section>
+      <div class="wrap layout">
+        <div class="card form">
+          <div class="start">
+            <label for="from">어디서 시작할까요?</label>
+            <select id="from"></select>
+          </div>
+          <div id="fields"></div>
+        </div>
+
+        <div class="card result">
+          <h3>완성된 프롬프트</h3>
+          <p class="meter" id="meter"></p>
+          <pre class="prompt-box" id="out"></pre>
+          <p class="warn" id="warn" hidden></p>
+          <div class="row">
+            <button class="btn primary" id="copy">복사하기</button>
+            <button class="btn" id="reset">모두 지우기</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="wrap">© 프롬프트 작업대 · AI의 답은 제출 전에 꼭 직접 확인하세요.</div></footer>
+
+  <script src="prompts.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const SAVE_KEY = "prompt-workbench-draft";
+    const fieldsEl = document.getElementById("fields");
+    const fromEl = document.getElementById("from");
+
+    // 시작점 고르기: 빈 양식 + 모든 프롬프트
+    fromEl.innerHTML = `<option value="">빈 양식에서 시작</option>` +
+      [...new Set(PROMPTS.map(p => p.category))].map(cat =>
+        `<optgroup label="${cat}">${PROMPTS.filter(p => p.category === cat)
+          .map(p => `<option value="${p.id}">${escapeHtml(p.title)}</option>`).join("")}</optgroup>`).join("");
+
+    fieldsEl.style.display = "grid";
+    fieldsEl.style.gap = "18px";
+    fieldsEl.innerHTML = STEPS.map((s, i) => `
+      <div class="field">
+        <label for="f-${s.key}"><span class="num">0${i + 1}</span>${s.label} <small>${s.q}</small></label>
+        <textarea id="f-${s.key}" data-key="${s.key}" placeholder="${s.hint}"></textarea>
+      </div>`).join("");
+
+    function read() {
+      const d = {};
+      STEPS.forEach(s => d[s.key] = document.getElementById("f-" + s.key).value);
+      return d;
+    }
+    function fill(d) {
+      STEPS.forEach(s => document.getElementById("f-" + s.key).value = d[s.key] || "");
+      update();
+    }
+
+    function update() {
+      const d = read();
+      const text = buildPrompt(d);
+      const out = document.getElementById("out");
+      out.innerHTML = text ? highlightBlanks(text) : `<span style="color:var(--muted)">왼쪽 칸을 채우면 여기에 프롬프트가 나타나요.</span>`;
+
+      const filled = STEPS.filter(s => d[s.key].trim()).length;
+      document.getElementById("meter").textContent = `${filled} / 5칸 채움`;
+
+      const blanks = (text.match(/\[[^\]\n]+\]/g) || []).length;
+      const warn = document.getElementById("warn");
+      warn.hidden = !blanks;
+      warn.textContent = `아직 바꾸지 않은 [빈칸]이 ${blanks}개 있어요.`;
+
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify({ from: fromEl.value, ...d })); } catch {}
+    }
+
+    fieldsEl.addEventListener("input", update);
+
+    fromEl.addEventListener("change", () => {
+      const hasText = STEPS.some(s => read()[s.key].trim());
+      if (hasText && !confirm("지금 쓴 내용이 바뀝니다. 계속할까요?")) {
+        fromEl.value = fromEl.dataset.prev || ""; return;
+      }
+      fromEl.dataset.prev = fromEl.value;
+      const p = PROMPTS.find(x => x.id === fromEl.value);
+      fill(p || {});
+    });
+
+    document.getElementById("copy").addEventListener("click", () => {
+      const text = buildPrompt(read());
+      if (!text) { toast("먼저 칸을 채워 주세요."); return; }
+      copyText(text);
+    });
+    document.getElementById("reset").addEventListener("click", () => {
+      if (!confirm("다섯 칸을 모두 지울까요?")) return;
+      fromEl.value = ""; fromEl.dataset.prev = ""; fill({});
+    });
+
+    // 처음 열 때: 주소에 ?from= 이 있으면 그 프롬프트로, 아니면 저장된 내용으로
+    const fromParam = new URLSearchParams(location.search).get("from");
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch {}
+    const start = PROMPTS.find(p => p.id === fromParam);
+    if (start) { fromEl.value = start.id; fill(start); }
+    else if (saved) { fromEl.value = saved.from || ""; fill(saved); }
+    else update();
+    fromEl.dataset.prev = fromEl.value;
+  </script>
+</body>
+</html>

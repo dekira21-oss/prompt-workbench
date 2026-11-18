@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>프롬프트 모음 · 프롬프트 작업대</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .head { padding: 48px 0 24px; }
+    .filters { display: grid; gap: 14px; margin-bottom: 24px; }
+    .count { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+    .empty { padding: 40px; text-align: center; color: var(--muted); }
+    section { padding-top: 0; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="logo" href="index.html"><b>작</b>프롬프트 작업대</a>
+      <nav>
+        <a href="prompts.html" aria-current="page">프롬프트 모음</a>
+        <a href="generator.html">생성기</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap head">
+      <p class="eyebrow">PROMPTS</p>
+      <h2>프롬프트 모음</h2>
+      <p class="lead">분류와 태그로 찾고, 카드를 눌러 복사하세요.</p>
+    </div>
+    <section>
+      <div class="wrap">
+        <div class="filters">
+          <input type="search" id="q" placeholder="찾을 말을 입력하세요 (예: 인스타, 사업계획서)" />
+          <div class="chips" id="cats"></div>
+          <div class="chips" id="tags"></div>
+        </div>
+        <p class="count" id="count"></p>
+        <div class="grid" id="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="wrap">© 프롬프트 작업대 · AI의 답은 제출 전에 꼭 직접 확인하세요.</div></footer>
+
+  <script src="prompts.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const state = { q: "", cat: params.get("cat") || "전체", tag: params.get("tag") || "" };
+
+    const cats = ["전체", ...new Set(PROMPTS.map(p => p.category))];
+    // 많이 쓰인 태그부터
+    const tagCount = {};
+    PROMPTS.forEach(p => p.tags.forEach(t => tagCount[t] = (tagCount[t] || 0) + 1));
+    // 두 번 이상 쓰인 태그만 버튼으로 보여 줍니다 (나머지는 검색창으로 찾을 수 있어요)
+    const tags = Object.keys(tagCount).filter(t => tagCount[t] >= 2).sort((a, b) => tagCount[b] - tagCount[a]);
+
+    function render() {
+      document.getElementById("cats").innerHTML = cats.map(c =>
+        `<button class="chip" data-cat="${c}" aria-pressed="${c === state.cat}">${c}</button>`).join("");
+      document.getElementById("tags").innerHTML = tags.map(t =>
+        `<button class="chip" data-tag="${escapeHtml(t)}" aria-pressed="${t === state.tag}">#${escapeHtml(t)}</button>`).join("");
+
+      const q = state.q.trim().toLowerCase();
+      const list = PROMPTS.filter(p =>
+        (state.cat === "전체" || p.category === state.cat) &&
+        (!state.tag || p.tags.includes(state.tag)) &&
+        (!q || [p.title, p.summary, ...p.tags, buildPrompt(p)].join(" ").toLowerCase().includes(q)));
+
+      document.getElementById("count").textContent = `${list.length}개`;
+      document.getElementById("list").innerHTML = list.length
+        ? list.map(cardHtml).join("")
+        : `<div class="card empty" style="grid-column:1/-1">찾는 프롬프트가 없어요. <a href="generator.html">생성기에서 직접 만들어 보세요.</a></div>`;
+    }
+
+    document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; render(); });
+    document.getElementById("cats").addEventListener("click", e => {
+      const b = e.target.closest("[data-cat]"); if (!b) return;
+      state.cat = b.dataset.cat; render();
+    });
+    document.getElementById("tags").addEventListener("click", e => {
+      const b = e.target.closest("[data-tag]"); if (!b) return;
+      state.tag = state.tag === b.dataset.tag ? "" : b.dataset.tag; render();
+    });
+    setupDetailDialog(document.getElementById("list"));
+    render();
+  </script>
+</body>
+</html>

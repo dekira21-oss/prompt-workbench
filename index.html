@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>프롬프트 작업대</title>
+  <meta name="description" content="마케팅·SNS, 기획·사업계획 업무에 바로 쓰는 프롬프트 모음과 5칸 프롬프트 생성기" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .hero { padding: 88px 0 56px; }
+    .hero h1 { font-size: clamp(32px, 5.6vw, 54px); letter-spacing: -1.5px; margin-bottom: 18px; }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero .lead { font-size: 19px; }
+    .hero .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+    .hero-demo { margin-top: 48px; padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    .hero-demo .before { color: var(--muted); font-size: 15px; }
+    .hero-demo .before b { display: block; color: var(--text); font-size: 13px; margin-bottom: 6px; }
+    .hero-demo .after b { display: block; font-size: 13px; color: var(--accent); margin-bottom: 6px; }
+    .hero-demo .prompt-box { font-size: 14px; }
+    @media (max-width: 720px) { .hero-demo { grid-template-columns: 1fr; } }
+    .cat-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 40px 0 16px; }
+    .cat-head h3 { font-size: 22px; }
+    .band { background: var(--surface); border-block: 1px solid var(--line); }
+    .final { text-align: center; }
+    .final .lead { margin: 0 auto 24px; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="logo" href="index.html"><b>작</b>프롬프트 작업대</a>
+      <nav>
+        <a href="prompts.html">프롬프트 모음</a>
+        <a href="generator.html">생성기</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">마케팅 · 기획 업무용 프롬프트</p>
+        <h1>AI에게 잘 묻는 법,<br><em>다섯 칸</em>만 채우면 됩니다</h1>
+        <p class="lead">"홍보 문구 써 줘"보다 상황·목표·재료·형식·점검을 갖춘 질문이 훨씬 쓸 만한 결과를 돌려줍니다. 검증된 틀을 골라 빈칸만 바꿔 쓰세요.</p>
+        <div class="cta">
+          <a class="btn primary" href="prompts.html">프롬프트 둘러보기</a>
+          <a class="btn" href="generator.html">직접 만들어 보기</a>
+        </div>
+
+        <div class="card hero-demo">
+          <div class="before">
+            <b>흔한 질문</b>
+            "카페 인스타 글 써 줘"<br>→ 어디서 본 듯한 문장, 없는 할인 행사, 쓸 수 없는 해시태그
+          </div>
+          <div class="after">
+            <b>다섯 칸으로 묻기</b>
+            <pre class="prompt-box" id="demo"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="eyebrow">THE 5-BOX FRAME</p>
+        <h2>모든 프롬프트는 같은 다섯 칸으로 되어 있어요</h2>
+        <p class="lead">칸 이름만 기억하면 처음 보는 업무도 같은 순서로 질문을 짤 수 있습니다.</p>
+        <div class="steps" id="steps"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <p class="eyebrow">PROMPTS</p>
+        <h2>업무별로 바로 쓰는 프롬프트</h2>
+        <p class="lead">카드를 누르면 전체 프롬프트가 보이고, 그대로 복사하거나 생성기에서 빈칸을 채울 수 있어요.</p>
+        <div id="sections"></div>
+      </div>
+    </section>
+
+    <section class="band final">
+      <div class="wrap">
+        <h2>내 업무에 맞는 프롬프트, 지금 만들어 보세요</h2>
+        <p class="lead">회원가입 없이 무료로 쓸 수 있어요. 만든 프롬프트는 복사해서 ChatGPT·Claude·Gemini 어디에나 붙여 넣으면 됩니다.</p>
+        <a class="btn primary" href="generator.html">생성기 열기</a>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="wrap">© 프롬프트 작업대 · AI의 답은 제출 전에 꼭 직접 확인하세요.</div></footer>
+
+  <script src="prompts.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById("steps").innerHTML = STEPS.map((s, i) => `
+      <div class="card step">
+        <div class="num">0${i + 1}</div>
+        <h3>${s.label}</h3>
+        <p><b style="color:var(--text)">${s.q}</b><br>${s.hint}</p>
+      </div>`).join("");
+
+    const demo = PROMPTS.find(p => p.id === "insta-post");
+    document.getElementById("demo").innerHTML = highlightBlanks(buildPrompt(demo));
+
+    const cats = [...new Set(PROMPTS.map(p => p.category))];
+    const box = document.getElementById("sections");
+    box.innerHTML = cats.map(cat => {
+      const list = PROMPTS.filter(p => p.category === cat);
+      return `<div class="cat-head">
+          <h3>${cat} <span class="tag">${list.length}개</span></h3>
+          <a class="btn small" href="prompts.html?cat=${encodeURIComponent(cat)}">전체 보기 →</a>
+        </div>
+        <div class="grid">${list.slice(0, 3).map(cardHtml).join("")}</div>`;
+    }).join("");
+    setupDetailDialog(box);
+  </script>
+</body>
+</html>
